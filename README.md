@@ -33,28 +33,35 @@ SoftBank does not allow the NAO meshes to be redistributed directly, so you
 must install them from the official installer and combine them with the URDFs
 from `ros-naoqi/nao_robot`.
 
-Example setup inside this workspace:
+The teleoperator does not care *where* the model lives — it only needs the
+`nao_meshes` and `nao_robot` checkouts to sit side by side so the
+`package://` mesh references resolve. The example below uses a `NAO_DIR`
+variable so you can install anywhere; pick any directory you have write access
+to (e.g. `~/nao` or a `external/nao` folder inside your project).
 
 ```bash
-cd /root/lerobot
-mkdir -p external/nao
-cd external/nao
+# Choose where to install the NAO model.
+export NAO_DIR="$HOME/nao"
+mkdir -p "$NAO_DIR"
+cd "$NAO_DIR"
 
+# 1. Get the URDFs.
+git clone https://github.com/ros-naoqi/nao_robot.git
+
+# 2. Get the meshes (not redistributable, so installed from the official run file).
 wget -O naomeshes-0.6.7-linux-x64-installer.run \
   https://github.com/ros-naoqi/nao_meshes_installer/raw/master/naomeshes-0.6.7-linux-x64-installer.run
 chmod +x naomeshes-0.6.7-linux-x64-installer.run
 
-git clone https://github.com/ros-naoqi/nao_robot.git
-
 ./naomeshes-0.6.7-linux-x64-installer.run \
   --mode text \
-  --prefix /root/lerobot/external/nao/nao_meshes
+  --prefix "$NAO_DIR/nao_meshes"
 ```
 
-After installation, the expected layout is:
+After installation, the expected layout (relative to `$NAO_DIR`) is:
 
 ```text
-/root/lerobot/external/nao/
+$NAO_DIR/
   nao_meshes/
     meshes/
     texture/
@@ -65,13 +72,42 @@ After installation, the expected layout is:
           nao.urdf
 ```
 
+The `nao_meshes` and `nao_robot` directories must remain siblings — the
+teleoperator derives the mesh package roots from the URDF's location (see
+[URDF Loading](#urdf-loading)).
+
 For NAO V5, point the teleoperator at:
 
-`/root/lerobot/external/nao/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf`
+`$NAO_DIR/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf`
+
+The commands in [Usage](#usage) reuse this `$NAO_DIR` variable so you do not
+have to hardcode an absolute path.
 
 ## Usage
 
-Example command:
+### Choosing an arm
+
+This teleoperator controls exactly one arm, selected with `--teleop.arm`
+(`left` or `right`). The arm choice drives every arm-dependent setting, so you
+normally only need to set `--teleop.arm`:
+
+| Setting | `--teleop.arm=left` | `--teleop.arm=right` |
+| --- | --- | --- |
+| `arm_joint_names` | `LShoulderPitch`, `LShoulderRoll`, `LElbowYaw`, `LElbowRoll`, `LWristYaw` | `RShoulderPitch`, `RShoulderRoll`, `RElbowYaw`, `RElbowRoll`, `RWristYaw` |
+| `target_link_name` | `l_gripper` | `r_gripper` |
+| `hand_joint_name` | `LHand` | `RHand` |
+
+These are derived automatically from `--teleop.arm`; you only pass
+`--teleop.target_link_name`, `--teleop.arm_joint_names`, or
+`--teleop.hand_joint_name` if you need to override the defaults for a
+non-standard URDF.
+
+Make sure the robot uses the **same** arm as the teleoperator
+(`--robot.arm` must match `--teleop.arm`), otherwise the robot will reject the
+action keys (e.g. it expects `LShoulderPitch.pos` but receives
+`RShoulderPitch.pos`).
+
+### Right arm
 
 ```bash
 lerobot-teleoperate \
@@ -81,8 +117,20 @@ lerobot-teleoperate \
   --robot.enable_camera=false \
   --teleop.type=nao_ik \
   --teleop.arm=right \
-  --teleop.urdf_path=/root/lerobot/external/nao/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf \
-  --teleop.target_link_name=r_gripper
+  --teleop.urdf_path="$NAO_DIR/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf"
+```
+
+### Left arm
+
+```bash
+lerobot-teleoperate \
+  --robot.type=nao_qi \
+  --robot.robot_ip=127.0.0.1 \
+  --robot.arm=left \
+  --robot.enable_camera=false \
+  --teleop.type=nao_ik \
+  --teleop.arm=left \
+  --teleop.urdf_path="$NAO_DIR/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf"
 ```
 
 Then open `http://localhost:8080` and drag the target gizmo to move the selected NAO arm.
@@ -93,4 +141,4 @@ Then open `http://localhost:8080` and drag the target gizmo to move the selected
 - The exact joint names and target link must match your NAO URDF.
 - If your URDF exposes more actuated joints than the arm, the teleoperator keeps them locked.
 - A typical working path is `.../nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf`.
-- In the official `naoV50_generated_urdf`, `RHand` is a joint name, not a link name. Use `r_gripper` as the right-arm IK target link.
+- In the official `naoV50_generated_urdf`, `RHand`/`LHand` are joint names, not link names. Use `r_gripper` (right) or `l_gripper` (left) as the IK target link. These are selected automatically from `--teleop.arm`.
