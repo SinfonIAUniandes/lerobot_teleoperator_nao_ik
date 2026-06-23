@@ -87,8 +87,8 @@ have to hardcode an absolute path.
 
 ### Choosing an arm
 
-This teleoperator controls exactly one arm, selected with `--teleop.arm`
-(`left` or `right`). The arm choice drives every arm-dependent setting, so you
+Select which arm(s) to control with `--teleop.arm`. Valid values are `left`,
+`right`, and `both`. The arm choice drives every arm-dependent setting, so you
 normally only need to set `--teleop.arm`:
 
 | Setting | `--teleop.arm=left` | `--teleop.arm=right` |
@@ -97,15 +97,23 @@ normally only need to set `--teleop.arm`:
 | `target_link_name` | `l_gripper` | `r_gripper` |
 | `hand_joint_name` | `LHand` | `RHand` |
 
+With `--teleop.arm=both`, the teleoperator controls both arms at once: it
+exposes the left **and** right joints, draws a separate IK gizmo for each arm
+(`/ik_target_left` and `/ik_target_right`), and solves IK for each independently
+while keeping the rest of the body locked. The per-side target links
+(`l_gripper`, `r_gripper`) are selected automatically, so the
+`--teleop.target_link_name` / `--teleop.hand_joint_name` overrides apply to
+single-arm mode only.
+
 These are derived automatically from `--teleop.arm`; you only pass
 `--teleop.target_link_name`, `--teleop.arm_joint_names`, or
 `--teleop.hand_joint_name` if you need to override the defaults for a
-non-standard URDF.
+non-standard URDF (single-arm only).
 
 Make sure the robot uses the **same** arm as the teleoperator
 (`--robot.arm` must match `--teleop.arm`), otherwise the robot will reject the
 action keys (e.g. it expects `LShoulderPitch.pos` but receives
-`RShoulderPitch.pos`).
+`RShoulderPitch.pos`). The robot also accepts `--robot.arm=both`.
 
 ### Right arm
 
@@ -133,11 +141,25 @@ lerobot-teleoperate \
   --teleop.urdf_path="$NAO_DIR/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf"
 ```
 
-Then open `http://localhost:8080` and drag the target gizmo to move the selected NAO arm.
+### Both arms
+
+```bash
+lerobot-teleoperate \
+  --robot.type=nao_qi \
+  --robot.robot_ip=127.0.0.1 \
+  --robot.arm=both \
+  --robot.enable_camera=false \
+  --teleop.type=nao_ik \
+  --teleop.arm=both \
+  --teleop.urdf_path="$NAO_DIR/nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf"
+```
+
+Then open `http://localhost:8080` and drag the target gizmo to move the selected
+NAO arm. In `both` mode there are two gizmos — one per arm.
 
 ## Notes
 
-- The implementation is intentionally one-arm only.
+- Single-arm (`left`/`right`) and dual-arm (`both`) modes are supported.
 - The exact joint names and target link must match your NAO URDF.
 - If your URDF exposes more actuated joints than the arm, the teleoperator keeps them locked.
 - A typical working path is `.../nao_robot/nao_description/urdf/naoV50_generated_urdf/nao.urdf`.
